@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lakehead Daily Log</title>
+<meta name="theme-color" content="#12232B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily Log">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: one question group per screen, big tap targets, fixed Back/Next bar. Look: site-office paperwork, lake-slate ink, hi-vis orange only for the action that moves you forward. */
+:root{
+  color-scheme:light;
+  --bg:#F0F3F2; --card:#FFFFFF; --ink:#12232B; --muted:#53666D; --line:#CFD8D5; --chip:#E3EAE8;
+  --accent:#C2410C; --on-accent:#FFFFFF; --ok:#157A3C; --bad:#B42318; --focus:#1D6FA5;
+  --font-d:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --font-b:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1A1F; --card:#172830; --ink:#E7EEEB; --muted:#94A9B0; --line:#2B414A; --chip:#223741;
+  --accent:#FB923C; --on-accent:#1A0E05; --ok:#4ADE80; --bad:#F87171; --focus:#60B4E8; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F1A1F; --card:#172830; --ink:#E7EEEB; --muted:#94A9B0; --line:#2B414A; --chip:#223741;
+  --accent:#FB923C; --on-accent:#1A0E05; --ok:#4ADE80; --bad:#F87171; --focus:#60B4E8; color-scheme:dark;}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.4 var(--font-b);margin:0;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(120px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+
+/* header */
+.top{padding-block:16px 4px}
+.brand{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font:600 13px var(--font-b);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.brand b{font-weight:600;color:var(--ink)}
+.prog{display:flex;gap:4px;margin:8px 0 12px}
+.prog i{flex:1;height:6px;border-radius:3px;background:var(--chip)}
+.prog i.on{background:var(--accent)}
+.prog i.now{background:var(--ink)}
+h1{font:700 34px/1.05 var(--font-d);letter-spacing:.01em;text-transform:uppercase;margin:0;text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted);font-size:16px}
+
+/* fields */
+.stack{display:flex;flex-direction:column;gap:18px;padding-top:12px}
+.f label,.lbl{display:block;font:600 14px var(--font-b);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.req{color:var(--accent)}
+.in{width:100%;min-height:54px;font:500 18px var(--font-b);padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);appearance:none;-webkit-appearance:none}
+textarea.in{min-height:120px;resize:vertical;line-height:1.4}
+.in.err{border-color:var(--bad)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row2>*{min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:50px;padding:0 16px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font:600 17px var(--font-b);display:inline-flex;align-items:center;gap:8px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"]::before{content:"\2713";font-weight:700}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
+.seg .chip{justify-content:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.note{font-size:15px;color:var(--muted)}
+
+/* steppers */
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:50px;height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--chip);font:700 26px/1 var(--font-b);display:grid;place-items:center;padding:0}
+.stepper button:active{background:var(--line)}
+.stepper input{width:58px;height:50px;text-align:center;font:700 22px var(--font-b);font-variant-numeric:tabular-nums;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);padding:0}
+.stepper input.nz,.num.nz{border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:8px}
+.line{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px}
+.line .nm{font-weight:600;min-width:0}
+
+/* crew accordion */
+.craft{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.craft>button{width:100%;min-height:54px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;border:0;background:none;text-align:left}
+.craft .nm{font-weight:600;font-size:18px}
+.craft .sum{font:600 15px var(--font-b);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.craft .sum.nz{color:var(--ink)}
+.craft .body{display:none;padding:4px 14px 14px;border-top:1px solid var(--line)}
+.craft.open .body{display:block}
+.craft.open>button{background:var(--chip)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-top:10px}
+.pair>div{min-width:0}
+.pair .lbl{margin-bottom:6px}
+.totals{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;display:flex;gap:10px;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;font:600 15px var(--font-b);justify-content:space-between}
+.totals b{font:700 24px var(--font-d);margin-left:6px;font-variant-numeric:tabular-nums}
+
+/* production */
+.prod{display:flex;flex-direction:column;gap:10px}
+.prod .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.prod .hd b{font-size:18px}
+.prod .hd span{font:600 14px var(--font-b);color:var(--muted)}
+.num{width:100%;min-height:54px;text-align:center;font:600 20px var(--font-b);font-variant-numeric:tabular-nums;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);padding:0 10px}
+
+/* voice */
+.mic{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:66px;border-radius:12px;border:2px solid var(--accent);background:var(--card);color:var(--accent);font:700 22px var(--font-d);letter-spacing:.04em;text-transform:uppercase}
+.mic svg{width:28px;height:28px}
+.mic.live{background:var(--accent);color:var(--on-accent);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.78}}
+@media (prefers-reduced-motion:reduce){.mic.live{animation:none}}
+.tip{display:flex;gap:10px;font-size:15px;color:var(--muted);background:var(--chip);border-radius:10px;padding:10px 12px}
+.tip.warn{color:var(--ink);border-left:4px solid var(--accent)}
+
+/* switch */
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:60px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 14px;text-align:left}
+.sw .t{font-weight:600}
+.sw .pill{flex:none;width:52px;height:30px;border-radius:15px;background:var(--chip);border:1.5px solid var(--line);position:relative}
+.sw .pill::after{content:"";position:absolute;top:2px;left:2px;width:23px;height:23px;border-radius:50%;background:var(--muted)}
+.sw[aria-pressed="true"] .pill{background:var(--accent);border-color:var(--accent)}
+.sw[aria-pressed="true"] .pill::after{left:24px;background:var(--on-accent)}
+
+/* review */
+.rv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:16px}
+.rv dt{color:var(--muted)} .rv dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.miss{display:flex;flex-direction:column;gap:8px}
+.miss button{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:50px;padding:8px 14px;border-radius:10px;border:1.5px solid var(--bad);background:var(--card);text-align:left;font-weight:600}
+.miss button span{color:var(--bad);font:600 14px var(--font-b);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.ok{color:var(--ok);font-weight:600}
+.bad{color:var(--bad);font-weight:600}
+
+/* bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--bg);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bar-in{max-width:560px;margin:0 auto;display:flex;gap:10px}
+.btn{min-height:58px;border-radius:12px;border:2px solid var(--ink);background:var(--card);font:700 22px var(--font-d);letter-spacing:.05em;text-transform:uppercase;padding:0 20px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);flex:1}
+.btn.sec{flex:none}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.55}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:15px;padding:10px 0;min-height:44px}
+
+/* done + office */
+.big-ok{width:64px;height:64px;border-radius:50%;background:var(--ok);color:var(--bg);display:grid;place-items:center;font:700 36px var(--font-d)}
+.office-row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.office-row .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.office-row .h b{font-size:18px}
+.office-row p{margin:0;color:var(--muted);font-size:15px;overflow-wrap:anywhere}
+.banner{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--chip);border-radius:10px;padding:8px 12px;font-size:15px;margin-top:6px}
+.banner button{background:none;border:0;text-decoration:underline;color:var(--ink);font-weight:600;min-height:40px}
+.msg{padding:12px 14px;border-radius:10px;font-weight:500}
+.msg.e{background:var(--card);border:1.5px solid var(--bad);color:var(--ink)}
+.doc-title{font:700 44px/1 var(--font-d);text-transform:uppercase;margin:8px 0 4px}
+.addr{margin:0;color:var(--muted);font-size:15px}
+.sec{margin-top:26px;padding-top:20px;border-top:2px solid var(--ink)}
+h2{font:700 28px/1.1 var(--font-d);letter-spacing:.01em;text-transform:uppercase;margin:0;text-wrap:balance}
+</style>
+</head><body>
+<div class="top"><div class="wrap">
+  <div class="brand"><b>Lakehead Constructors, Inc.</b><span>CORP-014</span></div>
+  <h1 class="doc-title">Daily Log</h1>
+  <p class="addr">3801 Winter Street, Superior, WI 54880-5560 · (715) 392-5181</p>
+  <p class="sub">Fill in what applies, top to bottom. Required fields are marked <span class="req">*</span>. Tap the orange button at the bottom when done.</p>
+  <div id="banner"></div>
+</div></div>
+<main class="wrap" id="app"></main>
+<div class="bar"><div class="bar-in" id="bar"></div></div>
+<script>
+(function(){
+"use strict";
+var CRAFTS=["Ironworkers","Millwrights","Carpenters","Laborers","Pipefitters","Boilermakers","Cement Finishers","Painters","Operating Eng.","Bricklayers","Teamsters","Timekeeper","Project Engineer","Superintendent","Project Manager","Safety"];
+var EQUIP=["Cranes","Forklifts","JLG/Manlifts","Scissor Lifts","Weld Machines","Vac Truck","Air Compressor","Light Plants","Loaders"];
+var PROD=[["Concrete Poured","yd³"],["Concrete Forms","ft²"],["Excavation","yd³"],["Backfill","yd³"],["Structural Steel Erected","lbs"],["Rebar Installed","lbs."],["Piping Installed","ft."]];
+var WEATHER=["Clear","Cloudy","Rain","Snow","Windy","Hot","Cold","Fog"];
+var DELAYS=["Weather","Materials","Equipment","Labor Issues","Subcontractors","Safety","Design","Changed Conditions"];
+var DRAFT_KEY="lakehead-daily-log-draft-v1";
+
+var $=function(s,r){return (r||document).querySelector(s)};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fmtDate(s){return /^\d{4}-\d\d-\d\d$/.test(s||"")?s.slice(5,7)+"/"+s.slice(8)+"/"+s.slice(0,4):(s||"")}
+function cap(n){return Promise.resolve().then(function(){return window.claude&&window.claude.use?window.claude.use(n):null}).catch(function(){return null})}
+
+function fresh(carry){
+  return {
+    date:todayStr(),
+    customer:carry?carry.customer:"", jobNo:carry?carry.jobNo:"", project:carry?carry.project:"", location:carry?carry.location:"",
+    workDays:carry&&+carry.workDays?String(+carry.workDays+1):(carry?carry.workDays:""),
+    weather:[], temp:"", tempWhen:[], shift:carry?carry.shift:"", hrs:carry?carry.hrs:"", visitors:"",
+    crew:CRAFTS.map(function(n){return {name:n,lci:0,sub:0}}),
+    crewOther:[{name:"",lci:0,sub:0},{name:"",lci:0,sub:0}],
+    equip:EQUIP.map(function(n){return {name:n,qty:0}}),
+    prod:PROD.map(function(p){return {name:p[0],unit:p[1],today:"",total:""}}),
+    prodOther:{name:"",today:"",total:""},
+    extraWork:"", extraBy:"", extraDesc:"", quality:"", qualityWhy:"",
+    delays:[], delayDesc:"", desc:"", completedBy:"",
+    phased:false, pQC:"", pSpec:"", pInsp:"", pNonconf:"", pLost:"", pValid:""
+  };
+}
+
+var S=fresh(), step=0, view="form", openCraft=-1, showErrors=false, busy=false, notice="", lastSaved=null, hadDraft=false;
+var officeUnsub=null, officeDocs=null, officeErr="", isEditor=false, expandedOffice={};
+
+/* ---------- draft on this phone ---------- */
+function saveDraft(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify({S:S,step:step}))}catch(e){}}
+function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch(e){}}
+function loadDraft(){
+  try{var d=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+    if(d&&d.S&&Array.isArray(d.S.crew)&&d.S.crew.length===CRAFTS.length){S=Object.assign(fresh(),d.S);step=Math.min(+d.step||0,STEPS.length-1);hadDraft=true}}catch(e){}
+}
+
+/* ---------- state helpers ---------- */
+function getP(path){return path.split(".").reduce(function(o,k){return o==null?o:o[k]},S)}
+function setP(path,val){var ks=path.split("."),o=S;for(var i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val}
+function totals(){var a=0,b=0;S.crew.concat(S.crewOther).forEach(function(c){a+=+c.lci||0;b+=+c.sub||0});return {lci:a,sub:b}}
+
+/* ---------- widgets ---------- */
+function field(label,key,opts){opts=opts||{};
+  var v=getP(key),bad=showErrors&&opts.req&&!String(v||"").trim();
+  var el=opts.area?'<textarea class="in'+(bad?' err':'')+'" id="f-'+key+'" data-k="'+key+'" rows="'+(opts.rows||3)+'" placeholder="'+esc(opts.ph||"")+'">'+esc(v)+'</textarea>'
+    :'<input class="in'+(bad?' err':'')+'" id="f-'+key+'" data-k="'+key+'" type="'+(opts.type||"text")+'" value="'+esc(v)+'" placeholder="'+esc(opts.ph||"")+'"'+(opts.mode?' inputmode="'+opts.mode+'"':'')+' autocomplete="off" enterkeyhint="next">';
+  return '<div class="f"><label for="f-'+key+'">'+label+(opts.req?' <span class="req">*</span>':'')+'</label>'+el+'</div>';
+}
+function chips(label,key,vals){
+  return '<div class="f"><span class="lbl">'+label+'</span><div class="chips">'+vals.map(function(v){
+    return '<button type="button" class="chip" data-chip="'+key+'" data-v="'+esc(v)+'" aria-pressed="'+(S[key].indexOf(v)>-1)+'">'+esc(v)+'</button>'}).join("")+'</div></div>';
+}
+function seg(label,key,vals,req){
+  var bad=showErrors&&req&&!S[key];
+  return '<div class="f"><span class="lbl">'+label+(req?' <span class="req">*</span>':'')+(bad?' <span class="bad">Pick one</span>':'')+'</span><div class="seg">'+vals.map(function(v){
+    return '<button type="button" class="chip" data-seg="'+key+'" data-v="'+esc(v)+'" aria-pressed="'+(S[key]===v)+'">'+esc(v)+'</button>'}).join("")+'</div></div>';
+}
+function stepper(path,label){var v=getP(path);
+  return '<div class="stepper" role="group" aria-label="'+esc(label)+'"><button type="button" data-step="'+path+'" data-d="-1" aria-label="Fewer">−</button>'+
+    '<input id="n-'+path+'" data-k="'+path+'" data-int="1" inputmode="numeric" pattern="[0-9]*" value="'+v+'" class="'+(v>0?'nz':'')+'" aria-label="'+esc(label)+'">'+
+    '<button type="button" data-step="'+path+'" data-d="1" aria-label="More">+</button></div>';
+}
+
+/* ---------- steps ---------- */
+var STEPS=[
+ {t:"Job info",s:"Today's date and where you are working.",h:function(){return '<div class="stack">'+
+   field("Date","date",{type:"date",req:1})+field("Customer","customer",{req:1,ph:"Customer name"})+
+   '<div class="row2">'+field("Job #","jobNo",{req:1,ph:"e.g. 24-118"})+field("Work days on job","workDays",{mode:"numeric",ph:"0"})+'</div>'+
+   field("Project","project",{req:1,ph:"Project name"})+field("Location","location",{ph:"Site or town"})+'</div>'}},
+ {t:"Conditions",s:"Weather, shift and anyone who visited the site.",h:function(){return '<div class="stack">'+
+   chips("Weather","weather",WEATHER)+
+   '<div class="row2">'+field("Temperature (°F)","temp",{mode:"numeric",ph:"e.g. 45"})+chips("Reading taken","tempWhen",["A.M.","P.M."])+'</div>'+
+   seg("Shift","shift",["Day","Night","Other"])+seg("Hours per shift","hrs",["8","10","12"])+
+   field("Visitors today (list)","visitors",{area:1,rows:3,ph:"Names and company. Leave blank if none."})+'</div>'}},
+ {t:"Crew on site",s:"Tap a craft to enter numbers. Leave crafts with nobody at 0.",h:function(){
+   var t=totals();
+   var list=S.crew.map(function(c,i){return craftHTML(c,i,"crew."+i,false)}).join("")+S.crewOther.map(function(c,i){return craftHTML(c,16+i,"crewOther."+i,true)}).join("");
+   return '<div class="stack"><div class="totals" role="status"><span>LCI<b id="totLci">'+t.lci+'</b></span><span>Subs<b id="totSub">'+t.sub+'</b></span><span>All<b id="totAll">'+(t.lci+t.sub)+'</b></span></div><div class="list" id="crewList">'+list+'</div></div>'}},
+ {t:"Large equipment",s:"How many of each are on the job today.",h:function(){return '<div class="stack"><div class="list">'+S.equip.map(function(e,i){
+   return '<div class="line"><span class="nm">'+esc(e.name)+'</span>'+stepper("equip."+i+".qty",e.name)+'</div>'}).join("")+'</div></div>'}},
+ {t:"Production",s:"Quantities for today and the running total. Skip anything not worked.",h:function(){return '<div class="stack">'+S.prod.map(function(p,i){
+   return '<div class="card prod"><div class="hd"><b>'+esc(p.name)+'</b><span>'+esc(p.unit)+'</span></div><div class="row2">'+
+    numIn("Today","prod."+i+".today")+numIn("Total to date","prod."+i+".total")+'</div></div>'}).join("")+
+   '<div class="card prod"><div class="hd"><b>Other</b><span>list below</span></div>'+
+   '<input class="in" id="f-prodOther.name" data-k="prodOther.name" placeholder="What was installed? (with units)" value="'+esc(S.prodOther.name)+'" autocomplete="off">'+
+   '<div class="row2">'+numIn("Today","prodOther.today")+numIn("Total to date","prodOther.total")+'</div></div></div>'}},
+ {t:"Delays and checks",s:"Answer the three questions, then tick any delays.",h:function(){return '<div class="stack">'+
+   seg("Were you directed to perform any extra work, or work outside of scope today?","extraWork",["Yes","No"],1)+
+   (S.extraWork==="Yes"?'<div class="card stack" style="padding-top:14px">'+field("By whom?","extraBy",{ph:"Name of person"})+field("Describe","extraDesc",{area:1,rows:3,req:1,ph:"What extra work was requested?"})+'</div>':"")+
+   seg("Were all project quality procedures followed today?","quality",["Yes","No"],1)+
+   (S.quality==="No"?'<div class="card">'+field("If no, explain","qualityWhy",{area:1,rows:3,req:1,ph:"What was not followed and why?"})+'</div>':"")+
+   chips("Work delays (tick all that apply)","delays",DELAYS)+
+   (S.delays.length?field("Describe the delay","delayDesc",{area:1,rows:3,ph:"What happened and how long?"}):"")+'</div>'}},
+ {t:"Work description",s:"What got done today, special conditions, milestones reached.",h:function(){
+   var bad=showErrors&&!S.desc.trim();
+   return '<div class="stack"><button type="button" class="mic" id="micBtn" data-act="mic" aria-pressed="false">'+micLabel()+'</button><div id="voiceMsg"></div>'+
+   '<div class="f"><label for="f-desc">Describe daily work in progress'+' <span class="req">*</span></label><textarea class="in'+(bad?' err':'')+'" id="f-desc" data-k="desc" rows="10" placeholder="Speak, or type here. Include special conditions, delays, quality issues and finished milestones.">'+esc(S.desc)+'</textarea></div>'+
+   '<div class="tip"><span>Keyboard dictation works too. Tap in the box, then tap the microphone key on your keyboard (next to the space bar on iPhone, top of the keyboard on Android).</span></div></div>'}},
+ {t:"Sign off",s:"Add your name. Turn on the phased section only if this job is set up that way.",h:function(){return reviewHTML()}}
+];
+function numIn(label,path){var v=getP(path);return '<div><span class="lbl">'+label+'</span><input class="num'+(v?' nz':'')+'" id="n-'+path+'" data-k="'+path+'" data-dec="1" inputmode="decimal" placeholder="0" value="'+esc(v)+'"></div>'}
+function craftHTML(c,idx,path,isOther){
+  var open=openCraft===idx, nz=(+c.lci||0)+(+c.sub||0)>0;
+  var name=isOther?(c.name||"Other (tap to name)"):c.name;
+  return '<div class="craft'+(open?' open':'')+'" data-craft-wrap="'+idx+'"><button type="button" data-craft="'+idx+'" aria-expanded="'+open+'"><span class="nm">'+esc(name)+'</span><span class="sum'+(nz?' nz':'')+'" id="sum-'+idx+'">LCI '+(+c.lci||0)+' · Sub '+(+c.sub||0)+'</span></button>'+
+    '<div class="body">'+(isOther?'<div style="padding-top:10px"><label class="lbl" for="f-'+path+'.name">Craft name</label><input class="in" id="f-'+path+'.name" data-k="'+path+'.name" data-craftname="'+idx+'" value="'+esc(c.name)+'" placeholder="e.g. Electricians" autocomplete="off"></div>':'')+
+    '<div class="pair"><div><span class="lbl">LCI onsite</span>'+stepper(path+".lci",name+" LCI")+'</div><div><span class="lbl">Sub employees</span>'+stepper(path+".sub",name+" subcontractor")+'</div></div></div></div>'}
+
+function missing(){var m=[];
+  if(!S.date)m.push(["Date",0]); if(!S.customer.trim())m.push(["Customer",0]); if(!S.jobNo.trim())m.push(["Job #",0]); if(!S.project.trim())m.push(["Project",0]);
+  if(!S.extraWork)m.push(["Extra work question",5]); else if(S.extraWork==="Yes"&&!S.extraDesc.trim())m.push(["Describe the extra work",5]);
+  if(!S.quality)m.push(["Quality procedures question",5]); else if(S.quality==="No"&&!S.qualityWhy.trim())m.push(["Explain quality issue",5]);
+  if(!S.desc.trim())m.push(["Work description",6]); if(!S.completedBy.trim())m.push(["Your name",7]);
+  return m}
+
+/* ---------- voice ---------- */
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition, rec=null, listening=false, voiceBase="";
+var MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+function micLabel(){return MIC+'<span>'+(listening?'Listening. Tap to stop':'Tap to speak')+'</span>'}
+function voiceMsg(html,warn){var m=$("#voiceMsg");if(m)m.innerHTML=html?'<div class="tip'+(warn?' warn':'')+'"><span>'+html+'</span></div>':""}
+function refreshMic(){var b=$("#micBtn");if(!b)return;b.classList.toggle("live",listening);b.setAttribute("aria-pressed",listening);b.innerHTML=micLabel()}
+function setDesc(v){S.desc=v;var ta=$("#f-desc");if(ta){ta.value=v;ta.scrollTop=ta.scrollHeight}saveDraft()}
+function toggleVoice(){
+  if(listening&&rec){try{rec.stop()}catch(e){}return}
+  if(!SR){voiceMsg("Voice typing is not available in this view. Use the microphone key on your keyboard instead.",true);return}
+  try{
+    rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=true;voiceBase=S.desc.trim();
+    rec.onresult=function(e){var txt="";for(var i=0;i<e.results.length;i++)txt+=e.results[i][0].transcript;txt=txt.trim();setDesc((voiceBase?voiceBase+" ":"")+txt)};
+    rec.onerror=function(e){listening=false;refreshMic();
+      if(e.error==="not-allowed"||e.error==="service-not-allowed")voiceMsg("The microphone is blocked in this view. Tap in the box and use the microphone key on your keyboard to dictate.",true);
+      else if(e.error==="no-speech")voiceMsg("Did not hear anything. Tap to try again.",true);
+      else voiceMsg("Voice typing stopped. Tap to try again, or use your keyboard's microphone key.",true)};
+    rec.onend=function(){listening=false;refreshMic()};
+    rec.start();listening=true;voiceMsg("");refreshMic();
+  }catch(e){listening=false;refreshMic();voiceMsg("Voice typing could not start. Use the microphone key on your keyboard instead.",true)}
+}
+
+/* ---------- PDF (mirrors form CORP-014) ---------- */
+function buildPdf(R){
+  var jsPDF=window.jspdf&&window.jspdf.jsPDF; if(!jsPDF)throw new Error("pdf-lib");
+  var d=new jsPDF({unit:"pt",format:"letter"}),M=28,W=556; d.setLineWidth(.6);
+  function T(s,x,y,sz,b,al){d.setFont("helvetica",b?"bold":"normal");d.setFontSize(sz||8);d.text(String(s==null?"":s),x,y,{align:al||"left"})}
+  function B(x,y,w,h){d.rect(x,y,w,h)}
+  function wrap(s,w,sz,max){d.setFont("helvetica","normal");d.setFontSize(sz);var l=d.splitTextToSize(String(s||""),w);return max?l.slice(0,max):l}
+  function cb(x,y,on,label,sz){sz=sz||7.5;d.rect(x,y-6.5,7,7);if(on){d.line(x+1,y-5.5,x+6,y-.5);d.line(x+6,y-5.5,x+1,y-.5)}T(label,x+10,y,sz,0);return x+10+d.getTextWidth(label)+9}
+  function lv(x,y,w,h,label,val,sz){sz=sz||8.5;B(x,y,w,h);T(label,x+3,y+h-4.5,sz,1);var lw=d.getTextWidth(label);var v=wrap(val,Math.max(10,w-lw-12),sz,1)[0]||"";T(v,x+8+lw,y+h-4.5,sz,0)}
+  function ctr(s,x,w,y,sz,b){T(s,x+w/2,y,sz,b,"center")}
+
+  B(M,28,150,56);ctr("DAILY LOG",M,150,60,15,1);ctr("www.lakeheadconstructors.com",M,150,76,6.5,0);
+  B(178,28,230,56);ctr("LAKEHEAD CONSTRUCTORS, INC.",178,230,46,11,1);ctr("3801 Winter Street, Superior, WI 54880-5560",178,230,62,8,0);ctr("PHONE (715)392-5181 / FAX (715)392-7566",178,230,76,8,0);
+  lv(408,28,176,18.67,"Date",fmtDate(R.date));lv(408,46.67,176,18.67,"Weather",(R.weather||[]).join(", "));
+  B(408,65.33,176,18.67);T("Temperature",411,78,8.5,1);T(R.temp?R.temp+"°F":"",476,78,8.5,0);cb(512,78,(R.tempWhen||[]).indexOf("A.M.")>-1,"A.M.",7);cb(549,78,(R.tempWhen||[]).indexOf("P.M.")>-1,"P.M.",7);
+  lv(M,84,380,16,"Customer",R.customer);lv(408,84,176,16,"Job #",R.jobNo);
+  lv(M,100,380,16,"Location",R.location);lv(408,100,176,16,"Work Days on Job",R.workDays);
+  lv(M,116,200,16,"Project",R.project);
+  B(228,116,180,16);T("Shift:",231,127.5,8.5,1);var x=cb(260,127.5,R.shift==="Day","Day",7);x=cb(x,127.5,R.shift==="Night","Night",7);cb(x,127.5,R.shift==="Other","Other",7);
+  B(408,116,176,16);T("Hrs./Shift",411,127.5,8.5,1);x=cb(470,127.5,R.hrs==="8","8",7.5);x=cb(x,127.5,R.hrs==="10","10",7.5);cb(x,127.5,R.hrs==="12","12",7.5);
+  B(M,132,W,22);T("Visitors Today (list):",M+3,142,8,1);wrap(R.visitors,W-100,8,2).forEach(function(l,i){T(l,M+98,142+i*9,8,0)});
+
+  var xs=[28,118,148,178,250,278,384,424,464,584],y0=154,hh=28,rh=13,n=19,yb0=y0+hh;
+  for(var c=0;c<9;c++)B(xs[c],y0,xs[c+1]-xs[c],hh);
+  ctr("Labor Crafts",28,90,y0+17,7.5,1);
+  ctr("TOTAL",118,30,y0+9,5.5,1);ctr("LCI",118,30,y0+16,5.5,1);ctr("ONSITE",118,30,y0+23,5.5,1);
+  ctr("TOTAL",148,30,y0+6,5.5,1);ctr("SUB",148,30,y0+12,5.5,1);ctr("EMP",148,30,y0+18,5.5,1);ctr("ONSITE",148,30,y0+24,5.5,1);
+  ctr("Large",178,72,y0+12,7.5,1);ctr("Equipment",178,72,y0+22,7.5,1);ctr("TOTAL",250,28,y0+17,6,1);
+  ctr("PRODUCTION",278,106,y0+17,7.5,1);ctr("TODAY",384,40,y0+17,6,1);ctr("TOTAL",424,40,y0+17,6,1);
+  for(var r=0;r<n;r++){var yy=yb0+r*rh,ty=yy+9.5;
+    for(var k=0;k<9;k++)B(xs[k],yy,xs[k+1]-xs[k],rh);
+    var cr=r<16?R.crew[r]:(r<18?R.crewOther[r-16]:null);
+    if(cr){ctr(cr.name||(r>=16?"Other:":""),28,90,ty,7.5,0);if(+cr.lci)ctr(cr.lci,118,30,ty,8,0);if(+cr.sub)ctr(cr.sub,148,30,ty,8,0)}
+    else{var tt=totalsOf(R);ctr("Total",28,90,ty,7.5,1);ctr(tt.lci,118,30,ty,8,1);ctr(tt.sub,148,30,ty,8,1)}
+    if(R.equip[r]){ctr(R.equip[r].name,178,72,ty,7.5,0);if(+R.equip[r].qty)ctr(R.equip[r].qty,250,28,ty,8,0)}
+    if(r<7){var pp=R.prod[r];T(wrap(pp.name+" ("+pp.unit+")",102,6.5,1)[0],281,ty,6.5,0);ctr(pp.today,384,40,ty,8,0);ctr(pp.total,424,40,ty,8,0)}
+    else if(r===7)T("Other: list below",281,ty,6.5,0);
+    else if(r===8){var po=R.prodOther||{};T(wrap(po.name,102,6.5,1)[0]||"",281,ty,6.5,0);ctr(po.today||"",384,40,ty,8,0);ctr(po.total||"",424,40,ty,8,0)}
+  }
+  var ybEnd=yb0+n*rh;
+  B(464,y0,120,ybEnd-y0);d.line(464,300,584,300);
+  var y=163;
+  wrap("Were you directed to perform any extra work, or work outside of scope today?",112,6.5).forEach(function(l){T(l,468,y,6.5,1);y+=7.5});
+  cb(468,y+3,R.extraWork==="Yes","Yes",7);cb(500,y+3,R.extraWork==="No","No",7);y+=16;
+  T("By Whom?",468,y,7,1);y+=8;wrap(R.extraBy,112,7,1).forEach(function(l){T(l,468,y,7,0)});y+=10;
+  T("Describe:",468,y,7,1);y+=8;wrap(R.extraDesc,112,7,10).forEach(function(l){T(l,468,y,7,0);y+=8});
+  y=309;wrap("Were all project quality procedures followed today?",112,6.5).forEach(function(l){T(l,468,y,6.5,1);y+=7.5});
+  cb(468,y+3,R.quality==="Yes","Yes",7);cb(500,y+3,R.quality==="No","No",7);y+=16;
+  T("If no, explain:",468,y,7,1);y+=8;wrap(R.qualityWhy,112,7,12).forEach(function(l){T(l,468,y,7,0);y+=8});
+
+  var yd=ybEnd;B(M,yd,W,54);T("Work Delays:",M+4,yd+12,8,1);x=M+68;
+  ["Weather","Materials","Equipment","Labor Issues","Subcontractors"].forEach(function(v){x=cb(x,yd+12,(R.delays||[]).indexOf(v)>-1,v,7.5)});
+  x=M+68;["Safety","Design","Changed Conditions"].forEach(function(v){x=cb(x,yd+25,(R.delays||[]).indexOf(v)>-1,v,7.5)});
+  T("Describe:",M+4,yd+38,8,1);wrap(R.delayDesc,W-62,7.5,2).forEach(function(l,i){T(l,M+50,yd+38+i*9,7.5,0)});
+
+  var yg=yd+57;B(M,yg,W,14);ctr("General Information - Describe Daily Work in Progress – Special Conditions (continue on back if needed)",M,W,yg+10,8.5,1);
+  var genH=R.phased?90:150,gy=yg+14;B(M,gy,W,genH);
+  var lines=wrap(R.desc,W-12,8),per=Math.floor((genH-8)/10);
+  lines.slice(0,per).forEach(function(l,i){T(l,M+5,gy+11+i*10,8,0)});
+  if(lines.length>per)T("(continued on page 2)",M+W-5,gy+genH-3,6.5,0,"right");
+  var yn=gy+genH;
+  wrap("Daily logs are required to be completed each day.  Be thorough and provide all information that may relate to work delays or quality issues. Special attention should be given to noting the completion of all important project milestones or significant scope in the General Information section.",W-20,7,3).forEach(function(l,i){ctr(l,M,W,yn+10+i*8.5,7,0)});
+  var yc=yn+36;B(M,yc,W,20);T("Completed by (Print or Legible Signature Required):",M+4,yc+13.5,9,1);var cw=d.getTextWidth("Completed by (Print or Legible Signature Required):");T(wrap(R.completedBy,W-cw-20,10,1)[0]||"",M+cw+12,yc+13.5,10,0);
+  if(R.phased){var yp=yc+26;B(M,yp,W,128);B(M+3,yp+3,W-6,122);ctr("COMPLETE THIS BOTTOM SECTION ONLY IF THIS JOB IS SET-UP AS A PHASED JOB.",M,W,yp+16,8.5,1);
+    var fy=yp+28;[["JOB SUPERVISION – DAILY QUALITY CHECK ITEM:",R.pQC],["SPECIFICATION REQUIREMENT:",R.pSpec],["INSPECTION RESULTS:",R.pInsp]].forEach(function(p){T(p[0],M+8,fy,7,1);T(wrap(p[1],W-24,7.5,1)[0]||"",M+8,fy+9,7.5,0);fy+=21});
+    fy=yp+99;[["Record of Non-conforming product?",R.pNonconf],["Lost or damaged customer property?",R.pLost],["Validation of special processes required?",R.pValid]].forEach(function(p){T(p[0],M+8,fy,7.5,1);var xx=cb(M+210,fy,p[1]==="N/A","N/A",7.5);cb(xx,fy,p[1]==="See attached","See attached (add sheets as necessary).",7.5);fy+=11})}
+  T("CORP-014",M,786,7,0);T("06/01/20",M+W,786,7,0,"right");
+
+  var rest=lines.slice(per);
+  while(rest.length){d.addPage();T("DAILY LOG (continued)  Job # "+(R.jobNo||"")+"  "+fmtDate(R.date)+"  "+(R.project||""),M,40,9,1);
+    var chunk=rest.slice(0,70);rest=rest.slice(70);chunk.forEach(function(l,i){T(l,M,60+i*10.5,8.5,0)})}
+  return d;
+}
+function reviewHTML(){
+  var phasedHTML=S.phased?'<div class="card stack" style="padding-top:14px">'+
+     field("Job supervision: daily quality check item","pQC",{area:1,rows:2})+field("Specification requirement","pSpec",{area:1,rows:2})+field("Inspection results","pInsp",{area:1,rows:2})+
+     seg("Record of non-conforming product?","pNonconf",["N/A","See attached"])+seg("Lost or damaged customer property?","pLost",["N/A","See attached"])+seg("Validation of special processes required?","pValid",["N/A","See attached"])+'</div>':"";
+  return '<div class="stack">'+
+   '<div class="f"><label for="f-completedBy">Completed by (print your full name) <span class="req">*</span></label><input class="in'+(showErrors&&!S.completedBy.trim()?' err':'')+'" id="f-completedBy" data-k="completedBy" value="'+esc(S.completedBy)+'" autocomplete="name" placeholder="First and last name"></div>'+
+   '<button type="button" class="sw" data-act="phased" aria-pressed="'+S.phased+'"><span><span class="t">This job is set up as a phased job</span><br><span class="note">Turn on to fill in the quality section</span></span><span class="pill"></span></button>'+phasedHTML+'</div>'}
+
+/* ---------- page ---------- */
+var pdfFile=null;
+function totalsOf(x){var a=0,b=0;(x.crew||[]).concat(x.crewOther||[]).forEach(function(c){a+=+c.lci||0;b+=+c.sub||0});return {lci:a,sub:b}}
+function secHTML(i){var st=STEPS[i];return '<h2>'+esc(st.t)+'</h2><p class="sub">'+esc(st.s)+'</p>'+st.h()}
+function renderSec(i){var el=$("#sec-"+i);if(el)el.innerHTML=secHTML(i)}
+function render(){
+  $("#app").innerHTML=STEPS.map(function(_,i){return '<section class="sec" id="sec-'+i+'">'+secHTML(i)+'</section>'}).join("")+'<section id="result" aria-live="polite"></section>';
+  chrome();
+}
+function chrome(){
+  $("#banner").innerHTML=hadDraft?'<div class="banner"><span>Continuing your saved draft.</span><button type="button" data-act="discard">Start over</button></div>':"";
+  $("#bar").innerHTML='<button type="button" class="btn pri" data-act="make"'+(busy?' disabled':'')+'>'+(busy?'Creating…':'Finish and create PDF')+'</button>';
+}
+function fname(){return "Daily-Log_"+String(S.jobNo||"job").replace(/[^\w-]+/g,"_")+"_"+(S.date||"")+".pdf"}
+function showResult(h){var r=$("#result");r.innerHTML=h;r.scrollIntoView({block:"start",behavior:"smooth"})}
+function resultHTML(){return '<div class="card stack" style="margin-top:22px"><div class="big-ok" aria-hidden="true">✓</div>'+
+  '<b style="font-size:20px">PDF ready</b><p class="note" style="margin:0">'+esc(fname())+'</p>'+
+  '<p style="margin:0">Tap Share, then choose <b>SharePoint</b> or <b>OneDrive</b> and pick the Daily Logs folder. If no share menu appears, the PDF downloads to your phone. Upload it from the Files or SharePoint app.</p>'+
+  '<button type="button" class="btn pri wide" data-act="share">Share or save PDF</button>'+
+  '<button type="button" class="btn wide" data-act="dl">Download PDF</button>'+
+  '<button type="button" class="link" data-act="newlog">Start next log</button></div>'}
+function download(){if(!pdfFile)return;var u=URL.createObjectURL(pdfFile),a=document.createElement("a");a.href=u;a.download=pdfFile.name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},60000)}
+function shareNow(){
+  if(!pdfFile)return;
+  try{if(navigator.canShare&&navigator.canShare({files:[pdfFile]})){navigator.share({files:[pdfFile],title:"Daily Log "+fmtDate(S.date)}).catch(function(e){if(e&&e.name!=="AbortError")download()});return}}catch(e){}
+  download();
+}
+function make(){
+  if(busy)return;var m=missing();
+  if(m.length){showErrors=true;render();
+    $("#result").innerHTML='<div class="stack" style="margin-top:22px"><span class="lbl">Finish these first</span><div class="miss">'+m.map(function(x){return '<button type="button" data-go="'+x[1]+'">'+esc(x[0])+'<span>Go</span></button>'}).join("")+'</div></div>';
+    var t=document.querySelector(".err,.bad");(t||$("#result")).scrollIntoView({block:"center",behavior:"smooth"});return}
+  busy=true;chrome();
+  try{var doc=buildPdf(JSON.parse(JSON.stringify(S)));pdfFile=new File([doc.output("blob")],fname(),{type:"application/pdf"});
+    busy=false;chrome();$("#result").innerHTML=resultHTML();$("#result").scrollIntoView({block:"start",behavior:"smooth"});shareNow();
+  }catch(e){busy=false;chrome();showResult('<div class="msg e" role="alert" style="margin-top:22px">The PDF could not be made. Check your signal (the PDF tool loads from the internet) and tap again. Your answers are saved on this phone.</div>')}
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",function(ev){
+  var el=ev.target.closest("[data-chip],[data-seg],[data-step],[data-craft],[data-go],[data-act]");if(!el)return;
+  if(el.dataset.chip){var k=el.dataset.chip,v=el.dataset.v,i=S[k].indexOf(v);if(i>-1)S[k].splice(i,1);else S[k].push(v);el.setAttribute("aria-pressed",i===-1);saveDraft();
+    if(k==="delays"){var had=!!$("#f-delayDesc");if((S.delays.length>0)!==had)renderSec(5)}return}
+  if(el.dataset.seg){var k2=el.dataset.seg,v2=el.dataset.v;S[k2]=S[k2]===v2?"":v2;saveDraft();
+    if(k2==="extraWork"||k2==="quality")renderSec(5);
+    else el.parentNode.querySelectorAll("[data-seg]").forEach(function(b){b.setAttribute("aria-pressed",S[k2]===b.dataset.v)});return}
+  if(el.dataset.step){var p=el.dataset.step,nv=Math.max(0,Math.min(999,(+getP(p)||0)+(+el.dataset.d)));setP(p,nv);var inp=document.getElementById("n-"+p);if(inp){inp.value=nv;inp.classList.toggle("nz",nv>0)}derived();saveDraft();return}
+  if(el.dataset.craft!==undefined){var idx=+el.dataset.craft;openCraft=openCraft===idx?-1:idx;document.querySelectorAll(".craft").forEach(function(c){var o=+c.dataset.craftWrap===openCraft;c.classList.toggle("open",o);c.firstChild.setAttribute("aria-expanded",o)});return}
+  if(el.dataset.go!==undefined){var sec=$("#sec-"+el.dataset.go);if(sec)sec.scrollIntoView({behavior:"smooth",block:"start"});return}
+  var a=el.dataset.act;
+  if(a==="make")make();
+  else if(a==="mic")toggleVoice();
+  else if(a==="phased"){S.phased=!S.phased;saveDraft();renderSec(7)}
+  else if(a==="share")shareNow();
+  else if(a==="dl")download();
+  else if(a==="discard"){S=fresh();hadDraft=false;showErrors=false;clearDraft();openCraft=-1;render();window.scrollTo(0,0)}
+  else if(a==="newlog"){S=fresh(S);pdfFile=null;hadDraft=false;showErrors=false;clearDraft();openCraft=-1;render();window.scrollTo(0,0)}
+});
+document.addEventListener("input",function(ev){
+  var el=ev.target;if(!el.dataset||el.dataset.k===undefined)return;var k=el.dataset.k,v=el.value;
+  if(el.dataset.int){v=v.replace(/\D/g,"").slice(0,3);if(el.value!==v)el.value=v;setP(k,v===""?0:+v);el.classList.toggle("nz",+v>0);derived()}
+  else if(el.dataset.dec){v=v.replace(/[^0-9.]/g,"");if(el.value!==v)el.value=v;setP(k,v);el.classList.toggle("nz",!!v)}
+  else{setP(k,v);if(el.classList.contains("err")&&v.trim())el.classList.remove("err")}
+  if(el.dataset.craftname!==undefined){var idx=+el.dataset.craftname,nm=document.querySelector('[data-craft-wrap="'+idx+'"] .nm');if(nm)nm.textContent=v||"Other (tap to name)"}
+  if(k==="desc"&&listening){voiceBase=v.trim()}
+  saveDraft();
+});
+function derived(){
+  var t=totals();var a=$("#totLci"),b=$("#totSub"),c=$("#totAll");if(a)a.textContent=t.lci;if(b)b.textContent=t.sub;if(c)c.textContent=t.lci+t.sub;
+  S.crew.concat(S.crewOther).forEach(function(cr,i){var s=document.getElementById("sum-"+i);if(s){var nz=(+cr.lci||0)+(+cr.sub||0)>0;s.textContent="LCI "+(+cr.lci||0)+" · Sub "+(+cr.sub||0);s.classList.toggle("nz",nz)}});
+}
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.tagName==="INPUT"){e.preventDefault();e.target.blur()}});
+
+/* ---------- boot ---------- */
+loadDraft();render();
+})();
+</script>
+</body></html>
